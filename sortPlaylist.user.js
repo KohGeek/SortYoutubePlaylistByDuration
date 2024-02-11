@@ -4,20 +4,23 @@
  *  - Renaming the script to more accurately reflects its capability
  *  - Change license to fit SPDX license list
  *  - Minor code cleanups
+ *  
+ *  Changelog 11/02/2023
+ *  - Migrated to a full proper repo to better support discussions, issues and pull requests
  */
 
 /* jshint esversion: 8 */
 // ==UserScript==
 // @name              Sort Youtube Playlist by Duration
-// @namespace         https://gist.github.com/KohGeek/65ad9e0118ee5f5ee484676731bcd092
-// @version           3.0.0
+// @namespace         https://github.com/KohGeek/SortYoutubePlaylistByDuration
+// @version           3.0.1
 // @description       As the name implies, sorts youtube playlist by duration
 // @author            KohGeek
 // @license           GPL-2.0-only
 // @match             http://*.youtube.com/playlist*
 // @match             https://*.youtube.com/playlist*
 // @require           https://greasyfork.org/scripts/374849-library-onelementready-es7/code/Library%20%7C%20onElementReady%20ES7.js
-// @supportURL        https://gist.github.com/KohGeek/65ad9e0118ee5f5ee484676731bcd092/
+// @supportURL        https://github.com/KohGeek/SortYoutubePlaylistByDuration/
 // @grant             none
 // @run-at            document-start
 // ==/UserScript==
