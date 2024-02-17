@@ -2,6 +2,8 @@
 
 Proper repository for Greasyfork plugin Sort Youtube Playlist By Duration (formerly Sort Youtube Watch Later by Duration)
 
+Now with Channel sorting!
+
 ## Contributing
 
 Contributors welcome! There are edge cases I cannot handle quickly especially in non-Chromium engines.
