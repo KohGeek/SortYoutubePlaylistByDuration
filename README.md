@@ -14,5 +14,5 @@ My setup is ViolentMonkey on Chromium and Firefox. Volunteers are encouraged to 
 
 Something about TM and Chrome Canary is not compatible and may cause issue. Three solution to this:
 1. Go to TM settings, change from Novice to Advanced, scroll down all the way to Experimental and **switch Inject mode to Instant**
-2. Goto [Chrome Experiments](chrome://flags/), enable `Enable (deprecated) synchronous mutation events` and restart Chrome.
+2. Go to [Chrome Experiments](chrome://flags/), enable `Enable (deprecated) synchronous mutation events` and restart Chrome.
 3. Reinstall Chrome completely, removing previous browsing data
