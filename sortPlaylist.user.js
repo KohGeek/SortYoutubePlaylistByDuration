@@ -1,6 +1,7 @@
 /**
  *  Changelog 07/08/2024
- *  - Emergency fix for innerHTML violations (untested)
+ *  - Emergency fix for innerHTML violations
+ *  - Script is now loaded at any YT page - allowing the script to load whenever user hot-navigates to a playlist page without reloading
  *
  *  Changelog 24/12/2023
  *  - Fixed an issue where recommended videos at the end of the list breaks sorting (due to the lack of reorder anchors)
@@ -8,7 +9,7 @@
  *  - Renaming the script to more accurately reflects its capability
  *  - Change license to fit SPDX license list
  *  - Minor code cleanups
- *  
+ *
  *  Changelog 11/02/2023
  *  - Migrated to a full proper repo to better support discussions, issues and pull requests
  */
@@ -17,12 +18,12 @@
 // ==UserScript==
 // @name              Sort Youtube Playlist by Duration
 // @namespace         https://github.com/KohGeek/SortYoutubePlaylistByDuration
-// @version           3.0.2
+// @version           3.0.3
 // @description       As the name implies, sorts youtube playlist by duration
 // @author            KohGeek
 // @license           GPL-2.0-only
-// @match             http://*.youtube.com/playlist*
-// @match             https://*.youtube.com/playlist*
+// @match             http://*.youtube.com/*
+// @match             https://*.youtube.com/*
 // @require           https://greasyfork.org/scripts/374849-library-onelementready-es7/code/Library%20%7C%20onElementReady%20ES7.js
 // @supportURL        https://github.com/KohGeek/SortYoutubePlaylistByDuration/
 // @grant             none
@@ -420,9 +421,9 @@ let activateSort = async () => {
 };
 
 /**
- * Initialise script - IIFE
+ * Initialisation wrapper for all on-screen elements.
  */
-(() => {
+let init = () => {
     onElementReady('div.thumbnail-and-metadata-wrapper', false, () => {
         renderContainerElement();
         addCssStyle();
@@ -432,5 +433,16 @@ let activateSort = async () => {
         renderSelectElement(1, autoScrollOptions, 'Auto Scroll');
         renderNumberElement(1, 1800, 'Wait Time After Drag (ms)');
         renderLogElement();
+    });
+}
+
+/**
+ * Initialise script - IIFE
+ */
+(() => {
+    init();
+    navigation.addEventListener('navigate', navigateEvent => {
+        const url = new URL(navigateEvent.destination.url);
+        if (url.pathname.includes('playlist')) init();
     });
 })();
