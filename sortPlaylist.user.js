@@ -1,4 +1,8 @@
-/** Changelog 24/12/2023
+/**
+ *  Changelog 07/08/2024
+ *  - Emergency fix for innerHTML violations (untested)
+ *
+ *  Changelog 24/12/2023
  *  - Fixed an issue where recommended videos at the end of the list breaks sorting (due to the lack of reorder anchors)
  *  - Attempted fix for "Upcoming" or any other non-timestamped based videos, sorting to bottom (operating on principle that split(':') will produce at least 2 elements on timestamps)
  *  - Renaming the script to more accurately reflects its capability
@@ -13,7 +17,7 @@
 // ==UserScript==
 // @name              Sort Youtube Playlist by Duration
 // @namespace         https://github.com/KohGeek/SortYoutubePlaylistByDuration
-// @version           3.0.1
+// @version           3.0.2
 // @description       As the name implies, sorts youtube playlist by duration
 // @author            KohGeek
 // @license           GPL-2.0-only
@@ -289,7 +293,7 @@ let renderLogElement = () => {
  */
 let addCssStyle = () => {
     const element = document.createElement('style');
-    element.innerHTML = css;
+    element.textContent = css;
     document.head.appendChild(element);
 };
 
