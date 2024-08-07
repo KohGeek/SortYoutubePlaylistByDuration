@@ -1,4 +1,7 @@
 /**
+ *  Changelog 08/08/2024
+ *  - Attempt to address the most serious of buggy code, script should now work in all but the longest playlist.
+ *
  *  Changelog 07/08/2024
  *  - Emergency fix for innerHTML violations
  *  - Script is now loaded at any YT page - allowing the script to load whenever user hot-navigates to a playlist page without reloading
@@ -18,7 +21,7 @@
 // ==UserScript==
 // @name              Sort Youtube Playlist by Duration
 // @namespace         https://github.com/KohGeek/SortYoutubePlaylistByDuration
-// @version           3.0.3
+// @version           3.1.0
 // @description       As the name implies, sorts youtube playlist by duration
 // @author            KohGeek
 // @license           GPL-2.0-only
@@ -81,9 +84,7 @@ const autoScrollOptions = [
 
 const debug = false;
 
-var scrollLoopTime = 500;
-
-var waitTimeAfterDrag = 1800;
+var scrollLoopTime = 600;
 
 let sortMode = 'asc';
 
@@ -154,15 +155,19 @@ let simulateDrag = (elemDrag, elemDrop) => {
 
 /**
  * Scroll automatically to the bottom of the page
+ * @param {number} lastScrollLocation - Last known location for scrollTop
  */
-let autoScroll = async () => {
+let autoScroll = async (scrollTop = null) => {
     let element = document.scrollingElement;
     let currentScroll = element.scrollTop;
+    let scrollDestination = scrollTop !== null ? scrollTop : element.scrollHeight;
+    let scrollCount = 0;
     do {
         currentScroll = element.scrollTop;
-        element.scrollTop = element.scrollHeight;
-        await new Promise((r) => setTimeout(r, scrollLoopTime));
-    } while (currentScroll != element.scrollTop);
+        element.scrollTop = scrollDestination;
+        await new Promise(r => setTimeout(r, scrollLoopTime));
+        scrollCount++;
+    } while (currentScroll != scrollDestination && scrollCount < 2 && stopSort === false);
 };
 
 /**
@@ -251,9 +256,8 @@ let renderSelectElement = (variable = 0, options = [], label = '') => {
  * Generate number element
  * @param {number} variable
  * @param {number} defaultValue
- * @param {string=} label
  */
-let renderNumberElement = (variable = 0, defaultValue = 0, label = '') => {
+let renderNumberElement = (defaultValue = 0, label = '') => {
     // Create div
     const elementDiv = document.createElement('div');
     elementDiv.className = 'sort-playlist-div sort-margin-right-3px';
@@ -264,13 +268,7 @@ let renderNumberElement = (variable = 0, defaultValue = 0, label = '') => {
     element.type = 'number';
     element.value = defaultValue;
     element.className = 'style-scope';
-    element.oninput = (e) => {
-        if (variable === 0) {
-            scrollLoopTime = +(e.target.value);
-        } else if (variable === 1) {
-            waitTimeAfterDrag = +(e.target.value);
-        }
-    };
+    element.oninput = (e) => { scrollLoopTime = +(e.target.value) };
 
     // Render input
     elementDiv.appendChild(element);
@@ -302,21 +300,22 @@ let addCssStyle = () => {
  * Sort videos by time
  * @param {Element[]} allAnchors - Array of anchors
  * @param {Element[]} allDragPoints - Array of draggable elements
- * @return {number} - Number of videos sorted
+ * @param {number} expectedCount - Expected length for video list
+ * @return {number} sorted - Number of videos sorted
  */
-let sortVideos = (allAnchors, allDragPoints) => {
+let sortVideos = (allAnchors, allDragPoints, expectedCount) => {
     let videos = [];
     let sorted = 0;
     let dragged = false;
 
     // Sometimes after dragging, the page is not fully loaded yet
     // This can be seen by the number of anchors not being a multiple of 100
-    if (allAnchors.length % 100 !== 0 && document.querySelector(".ytd-continuation-item-renderer") !== null) {
+    if (allDragPoints.length !== expectedCount || allAnchors.length !== expectedCount) {
         logActivity("Playlist is not fully loaded, waiting...");
         return 0;
     }
 
-    for (let j = 0; j < allAnchors.length; j++) {
+    for (let j = 0; j < allDragPoints.length; j++) {
         let thumb = allAnchors[j];
         let drag = allDragPoints[j];
 
@@ -356,13 +355,14 @@ let sortVideos = (allAnchors, allDragPoints) => {
         }
 
         sorted = j;
+
         if (stopSort || dragged) {
             break;
         }
     }
 
     return sorted;
-};
+}
 
 /**
  * There is an inherent limit in how fast you can sort the videos, due to Youtube refreshing
@@ -370,50 +370,72 @@ let sortVideos = (allAnchors, allDragPoints) => {
  * It is also much worse if you have a lot of videos, for every 100 videos, it's about an extra 2-4 seconds, maybe longer
  */
 let activateSort = async () => {
-    let allAnchors = document.querySelectorAll("ytd-item-section-renderer:first-of-type div#content a#thumbnail.inline-block.ytd-thumbnail");
-    let allDragPoints;
+    let reportedVideoCount = Number(document.querySelector(".metadata-stats span.yt-formatted-string:first-of-type").innerText);
+    let allDragPoints = document.querySelectorAll("ytd-item-section-renderer:first-of-type yt-icon#reorder");
+    let allAnchors;
 
     let sortedCount = 0;
-    let initialVideoCount = allAnchors.length;
+    let initialVideoCount = allDragPoints.length;
+    let scrollRetryCount = 0;
     stopSort = false;
 
-    while (document.querySelector(".ytd-continuation-item-renderer") !== null
+    while (reportedVideoCount !== initialVideoCount
         && document.URL.includes("playlist?list=")
         && stopSort === false
         && autoScrollInitialVideoList === true) {
-        logActivity("Loading more videos - " + allAnchors.length + " videos loaded");
+        logActivity("Loading more videos - " + allDragPoints.length + " videos loaded");
+        if (scrollRetryCount > 5) {
+            break;
+        } else if (scrollRetryCount > 0) {
+            logActivity(log.innerText + "\nReported video count does not match actual video count.\nPlease make sure you remove all unavailable videos.\nAttempt: " + scrollRetryCount + "/5")
+        }
 
-        if (allAnchors.length > 300) {
+        if (allDragPoints.length > 300) {
             logActivity(log.innerText + "\nNumber of videos loaded is high, sorting may take a long time");
-        } else if (allAnchors.length > 600) {
+        } else if (allDragPoints.length > 600) {
             logActivity(log.innerText + "\nSorting may take extremely long time/is likely to bug out");
         }
 
         await autoScroll();
 
-        allAnchors = document.querySelectorAll("ytd-item-section-renderer:first-of-type div#content a#thumbnail.inline-block.ytd-thumbnail");
-        initialVideoCount = allAnchors.length;
+        allDragPoints = document.querySelectorAll("ytd-item-section-renderer:first-of-type yt-icon#reorder");
+        initialVideoCount = allDragPoints.length;
+
+        if (((reportedVideoCount - initialVideoCount) / 10) < 1) {
+            // Here, we already waited for the scrolling so things should already be loaded.
+            // However, due to either unavailable video, or other discrepancy, the count do not match.
+            // We increment until it's time to break the loop.
+            scrollRetryCount++;
+        }
     }
 
     logActivity(initialVideoCount + " videos loaded.");
+    if (scrollRetryCount > 5) logActivity(log.innerText + "\nScroll attempt exhausted. Proceeding with sort despite video count mismatch.");
+    let loadedLocation = document.scrollingElement.scrollTop;
+    scrollRetryCount = 0;
 
     while (sortedCount < initialVideoCount && stopSort === false) {
-        allAnchors = document.querySelectorAll("ytd-item-section-renderer:first-of-type div#content a#thumbnail.inline-block.ytd-thumbnail");
         allDragPoints = document.querySelectorAll("ytd-item-section-renderer:first-of-type yt-icon#reorder");
+        allAnchors = document.querySelectorAll("ytd-item-section-renderer:first-of-type div#content a#thumbnail.inline-block.ytd-thumbnail");
+        scrollRetryCount = 0;
 
-        let anchorListLength = allAnchors.length;
-        if (!allAnchors[anchorListLength - 1].querySelector("#text")) {
-            logActivity("Video " + anchorListLength + " is not loaded yet, waiting " + waitTimeAfterDrag + "ms");
-            await new Promise((r) => setTimeout(r, waitTimeAfterDrag));
-            continue;
+        while (!allAnchors[initialVideoCount - 1].querySelector("#text") && stopSort === false) {
+            if (document.scrollingElement.scrollTop < loadedLocation && scrollRetryCount < 3) {
+                logActivity("Video " + initialVideoCount + " is not loaded yet, attempting to scroll.");
+                await autoScroll(currentLocation);
+                scrollRetryCount++;
+            } else {
+                logActivity("Video " + initialVideoCount + " is still not loaded. Brute forcing scroll.");
+                await autoScroll();
+            }
         }
 
-        sortedCount = sortVideos(allAnchors, allDragPoints) + 1;
-        await new Promise((r) => setTimeout(r, waitTimeAfterDrag));
+        sortedCount = Number(sortVideos(allAnchors, allDragPoints, initialVideoCount) + 1);
+        await new Promise(r => setTimeout(r, scrollLoopTime * 4));
     }
 
     if (stopSort === true) {
-        logActivity("Sort cancelled");
+        logActivity("Sort cancelled.");
         stopSort = false;
     } else {
         logActivity("Sort complete. Video sorted: " + sortedCount);
@@ -427,14 +449,14 @@ let init = () => {
     onElementReady('div.thumbnail-and-metadata-wrapper', false, () => {
         renderContainerElement();
         addCssStyle();
-        renderButtonElement(activateSort, 'Sort Videos', false);
+        renderButtonElement(async () => { await activateSort() }, 'Sort Videos', false);
         renderButtonElement(() => { stopSort = true }, 'Stop Sort', true);
         renderSelectElement(0, modeAvailable, 'Sort Mode');
         renderSelectElement(1, autoScrollOptions, 'Auto Scroll');
-        renderNumberElement(1, 1800, 'Wait Time After Drag (ms)');
+        renderNumberElement(600, 'Scroll Retry Time (ms)');
         renderLogElement();
     });
-}
+};
 
 /**
  * Initialise script - IIFE
@@ -443,6 +465,6 @@ let init = () => {
     init();
     navigation.addEventListener('navigate', navigateEvent => {
         const url = new URL(navigateEvent.destination.url);
-        if (url.pathname.includes('playlist')) init();
+        if (url.pathname.includes('playlist?')) init();
     });
 })();
